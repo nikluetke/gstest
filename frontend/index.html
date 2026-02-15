@@ -93,6 +93,24 @@ let wsConsole = null; let xterm = null;
 
 function el(tag, props){ const e = document.createElement(tag); if(props) Object.assign(e, props); return e }
 
+function getIconForImage(image){
+  if(!image) return '';
+  if(image.includes('minecraft')) return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="currentColor"/></svg>';
+  if(image.includes('valheim')) return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>';
+  if(image.includes('rust')) return '<svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 2 L15 8 L22 9 L17 14 L18 21 L12 18 L6 21 L7 14 L2 9 L9 8 Z" fill="currentColor"/></svg>';
+  if(image.includes('steamcmd')||image.includes('csgo')) return '<svg width="18" height="18" viewBox="0 0 24 24"><path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  return '<svg width="18" height="18" viewBox="0 0 24 24"><rect width="18" height="12" x="3" y="6" rx="2" fill="currentColor"/></svg>';
+}
+
+function formatStatus(s){
+  if(!s) return '<span class="badge">unknown</span>';
+  const lower = s.toLowerCase();
+  if(lower.includes('up')) return `<span class="badge">running</span>`;
+  if(lower.includes('healthy')) return `<span class="badge">healthy</span>`;
+  if(lower.includes('exited')||lower.includes('dead')||lower.includes('unhealthy')) return `<span class="badge" style="background:rgba(255,90,90,0.12);color:#ff9b9b">${s}</span>`;
+  return `<span class="badge">${s}</span>`;
+}
+
 function upsertRow(s){
   const tb = document.querySelector('#servers tbody');
   let row = serversByName[s.name];
@@ -102,14 +120,15 @@ function upsertRow(s){
     serversByName[s.name] = row;
     tb.appendChild(row);
   }
-  row.querySelector('.name').textContent = s.name;
+  // name with icon
+  row.querySelector('.name').innerHTML = `${getIconForImage(s.image)} <strong>${s.name}</strong>`;
   row.querySelector('.image').textContent = s.image;
-  row.querySelector('.status').textContent = s.status;
+  row.querySelector('.status').innerHTML = formatStatus(s.status);
   // port display
   let portCell = row.querySelector('.port');
   if(!portCell){ portCell = document.createElement('td'); portCell.className='port'; row.insertBefore(portCell, row.querySelector('.actions')); }
-  // try to parse host port from s.hostPort or leave dash
-  portCell.textContent = s.hostPort || '-';
+  // try to parse host port from s.hostPort or leave dash; make clickable if present
+  if(s.hostPort){ portCell.innerHTML = `<a href="http://${location.hostname}:${s.hostPort}" target="_blank" style="color:var(--accent);text-decoration:none">${s.hostPort}</a>` } else { portCell.textContent = '-' }
   const actions = row.querySelector('.actions');
   actions.classList.add('actions');
   actions.innerHTML='';
