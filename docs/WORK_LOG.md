@@ -54,3 +54,9 @@ Notes:
 - Persist theme choice in localStorage
 - Default behavior: 'system' uses system preference; overall UI variables default to dark when system prefers dark
 
+2026-02-15 12:44 CET - UX: Modern responsive UI
+- Reworked frontend CSS to a modern card-based responsive layout
+- Improved table responsiveness for narrow viewports (rows become cards)
+- Buttons styled, badges, and modals updated to match dark/light themes
+- Committed AND pushed UI improvements
+

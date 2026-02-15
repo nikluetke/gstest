@@ -5,25 +5,51 @@
   <title>Gameserver Manager - MVP</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
   <style>
-    body{font-family:system-ui,Arial;margin:20px}
-    table{border-collapse:collapse;width:100%;table-layout:fixed}
-    th,td{border:1px solid var(--border);padding:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    th{background:var(--th-bg)}
-    button{padding:6px 10px;margin:4px;white-space:nowrap}
-    td .actions{display:flex;gap:6px;flex-wrap:wrap}
-    :root{--bg:#ffffff;--text:#000000;--border:#ddd;--th-bg:#f4f4f4}
-    .theme-dark{--bg:#0b0b0d;--text:#e6eef8;--border:#222;--th-bg:#111}
-    .theme-light{--bg:#ffffff;--text:#000000;--border:#ddd;--th-bg:#f4f4f4}
-    body{background:var(--bg);color:var(--text)}
-    table, #logModal, #consoleModal{background:var(--bg)}
-    #controls{margin-bottom:12px}
-    #createForm input, #createForm select{margin-right:6px}
-    #logModal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:80%;height:60%;background:#fff;border:1px solid #ccc;box-shadow:0 10px 30px rgba(0,0,0,.2);display:none;flex-direction:column}
-    #logModal pre{flex:1;overflow:auto;padding:10px;background:#000;color:#0f0;font-family:monospace;margin:0}
-    #logModal .head{padding:8px;border-bottom:1px solid #eee}
-    #consoleModal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:80%;height:70%;background:#fff;border:1px solid #ccc;box-shadow:0 10px 30px rgba(0,0,0,.2);display:none;flex-direction:column}
-    #consoleArea{flex:1;background:#000;color:#0f0;font-family:monospace;padding:10px;overflow:auto}
-    #consoleInput{width:100%;box-sizing:border-box;padding:8px;border-top:1px solid #ccc}
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa7b2;--text:#e6eef8;--accent:#4f46e5;--border:rgba(255,255,255,0.06)}
+    .theme-light{--bg:#ffffff;--card:#ffffff;--muted:#666;--text:#0b1224;--accent:#2563eb;--border:#e6e9ef}
+
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);}
+    .container{max-width:1100px;margin:18px auto;padding:16px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    h1{margin:0;font-size:1.2rem}
+    .controls{display:flex;gap:12px;align-items:center}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
+
+    /* form */
+    #createForm{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    #createForm input,#createForm select{padding:8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text)}
+    #createForm button{background:var(--accent);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+    #createForm .status{font-size:0.9rem;color:var(--muted);margin-left:8px}
+
+    /* table */
+    .table-wrap{overflow:auto;margin-top:12px}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    thead th{text-align:left;padding:10px 12px;background:transparent;color:var(--muted);font-size:0.85rem}
+    tbody tr{border-top:1px solid rgba(255,255,255,0.02)}
+    td{padding:12px;font-size:0.95rem;vertical-align:middle}
+    td.port{width:90px}
+    td.actions{width:260px}
+    .btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:8px;cursor:pointer}
+    .btn.primary{background:var(--accent);border:none;color:white}
+    .btn.danger{border-color:#ff6b6b}
+    .badge{font-size:0.8rem;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,0.03);color:var(--muted)}
+
+    /* modals */
+    .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:90%;max-width:900px;height:70%;background:var(--card);border:1px solid var(--border);border-radius:10px;display:none;flex-direction:column;overflow:hidden}
+    .modal .head{padding:10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+    .modal pre{flex:1;overflow:auto;padding:12px;background:transparent;color:var(--text);margin:0}
+
+    /* console xterm area */
+    #consoleArea{height:100%;}
+
+    /* responsive */
+    @media (max-width:800px){
+      thead{display:none}
+      tbody td{display:block;padding:10px;border-bottom:1px solid var(--border)}
+      tbody tr{margin-bottom:8px;display:block}
+      td.actions{display:flex;gap:8px}
+    }
   </style>
 </head>
 <body>
