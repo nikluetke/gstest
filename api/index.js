@@ -24,9 +24,9 @@ async function containerToServer(c) {
 // Templates
 const TEMPLATES = {
   minecraft: { id:'minecraft', name:'Minecraft (itzg)', image:'itzg/minecraft-server:latest', ports:[25565], env:{EULA:'TRUE', MEMORY:'1G'} },
-  csgo: { id:'csgo', name:'CS:GO (SteamCMD)', image:'cm2network/steamcmd:root', ports:[], env:{} },
-  valheim: { id:'valheim', name:'Valheim', image:'llnl/valheim-server:latest', ports:[2456,2457], env:{} },
-  rust: { id:'rust', name:'Rust', image:'iron/rust-server:latest', ports:[28015], env:{} },
+  csgo: { id:'csgo', name:'CS:GO (SteamCMD)', image:'cm2network/steamcmd:root', ports:[27015], env:{STEAM_ACCOUNT:'', SRCDS_TOKEN:''}, cmd:null },
+  valheim: { id:'valheim', name:'Valheim', image:'llnl/valheim-server:latest', ports:[2456,2457], env:{NAME:'Valheim', WORLD:'world', PORT:'2456'} },
+  rust: { id:'rust', name:'Rust', image:'xtrarama/rust-server:latest', ports:[28015], env:{RUST_SERVER_NAME:'RustServer'} },
   alpine: { id:'alpine', name:'Alpine', image:'alpine:3.18', ports:[], env:{} }
 };
 app.get('/templates',(req,res)=> res.json({ templates: Object.values(TEMPLATES) }));
