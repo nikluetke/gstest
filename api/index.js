@@ -21,6 +21,16 @@ async function containerToServer(c) {
   };
 }
 
+// Templates
+const TEMPLATES = {
+  minecraft: { id:'minecraft', name:'Minecraft (itzg)', image:'itzg/minecraft-server:latest', ports:[25565], env:{EULA:'TRUE', MEMORY:'1G'} },
+  csgo: { id:'csgo', name:'CS:GO (SteamCMD)', image:'cm2network/steamcmd:root', ports:[], env:{} },
+  valheim: { id:'valheim', name:'Valheim', image:'llnl/valheim-server:latest', ports:[2456,2457], env:{} },
+  rust: { id:'rust', name:'Rust', image:'iron/rust-server:latest', ports:[28015], env:{} },
+  alpine: { id:'alpine', name:'Alpine', image:'alpine:3.18', ports:[], env:{} }
+};
+app.get('/templates',(req,res)=> res.json({ templates: Object.values(TEMPLATES) }));
+
 // List containers managed by label 'gs_manager=1'
 app.get('/servers', async (req, res) => {
   try{
@@ -49,13 +59,18 @@ async function findFreePort(base){
 
 // Create a new placeholder game container (image + name)
 app.post('/servers/create', async (req, res) => {
-  const { name, image } = req.body;
-  if (!name || !image) return res.status(400).json({ error: 'name and image required' });
+  const { name, image, template } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
   try{
+    let tpl = null;
+    if(template && TEMPLATES[template]) tpl = TEMPLATES[template];
+    const img = tpl ? tpl.image : image;
+    if(!img) return res.status(400).json({ error: 'image required' });
+
     // template heuristics: if image looks like minecraft, expose 25565, else no host binding
-    const isMinecraft = image.toLowerCase().includes('minecraft') || image.toLowerCase().includes('itzg/minecraft');
+    const isMinecraft = (tpl && tpl.id==='minecraft') || img.toLowerCase().includes('minecraft') || img.toLowerCase().includes('itzg/minecraft');
     const opts = {
-      Image: image,
+      Image: img,
       name: name,
       Labels: { gs_manager: '1' },
       HostConfig: {
@@ -64,16 +79,64 @@ app.post('/servers/create', async (req, res) => {
       }
     };
     if(isMinecraft){
-      const hostPort = await findFreePort(25565);
+      // allow client to request a specific port
+      let hostPort = req.body.port ? String(req.body.port) : await findFreePort(25565);
+      // basic validation
+      if(isNaN(parseInt(hostPort)) || parseInt(hostPort) < 1024 || parseInt(hostPort) > 65535) return res.status(400).json({ error: 'invalid port' });
+      opts.Env = opts.Env || [];
+      // default EULA and memory if not set, or from template
+      const tplEnv = (tpl && tpl.env) ? tpl.env : {};
+      Object.entries(tplEnv).forEach(([k,v])=>{ if(!opts.Env.some(e=>e.startsWith(k+'='))) opts.Env.push(`${k}=${v}`) });
+      if(!opts.Env.some(e=>e.startsWith('EULA='))) opts.Env.push('EULA=TRUE');
+      if(!opts.Env.some(e=>e.startsWith('MEMORY='))) opts.Env.push('MEMORY=1G');
       opts.ExposedPorts = { '25565/tcp': {} };
       opts.HostConfig.PortBindings = { '25565/tcp': [{ HostPort: hostPort }] };
+      opts._hostPort = hostPort; // for response
+    } else if(tpl && tpl.ports && tpl.ports.length){
+      // map template ports to available host ports sequentially
+      opts.ExposedPorts = {};
+      opts.HostConfig.PortBindings = {};
+      for(const p of tpl.ports){
+        const hostPort = await findFreePort(p);
+        opts.ExposedPorts[`${p}/tcp`] = {};
+        opts.HostConfig.PortBindings[`${p}/tcp`] = [{ HostPort: String(hostPort) }];
+      }
     }
     const container = await docker.createContainer(opts);
     await container.start();
-    res.json({ id: container.id });
+    res.json({ id: container.id, hostPort: opts._hostPort });
   }catch(err){
     res.status(500).json({ error: err.message });
   }
+});
+
+// Update port: recreate container with same data volume and new host port
+app.post('/servers/:name/port', async (req,res)=>{
+  const name = req.params.name; const { port } = req.body;
+  if(!port) return res.status(400).json({ error: 'port required' });
+  try{
+    const containers = await docker.listContainers({all:true, filters:{name:[name]}});
+    if(!containers.length) return res.status(404).json({ error: 'not found' });
+    const old = containers[0];
+    const info = await docker.getContainer(old.Id).inspect();
+    // stop and remove
+    try{ await docker.getContainer(old.Id).stop(); }catch(e){}
+    await docker.getContainer(old.Id).remove({force:true});
+    // recreate with same image and binds
+    const opts = {
+      Image: info.Config.Image,
+      name: name,
+      Labels: { gs_manager: '1' },
+      HostConfig: { RestartPolicy:{Name:'no'}, Binds: info.HostConfig.Binds || [] }
+    };
+    // assume minecraft
+    opts.Env = info.Config.Env || [];
+    opts.ExposedPorts = { '25565/tcp': {} };
+    opts.HostConfig.PortBindings = { '25565/tcp': [{ HostPort: String(port) }] };
+    const c = await docker.createContainer(opts);
+    await c.start();
+    res.json({ result:'ok', hostPort: String(port) });
+  }catch(err){ res.status(500).json({ error: err.message }); }
 });
 
 app.post('/servers/:name/start', async (req, res) => {
@@ -141,7 +204,12 @@ wss.on('connection', async function connection(ws, req) {
       // stream logs (follow)
       const logStream = await c.logs({stdout:true,stderr:true,follow:true,tail:200});
       logStream.on('data', chunk => {
-        try{ ws.send(chunk.toString()); }catch(e){}
+        try{
+          const text = chunk.toString();
+          // send in safe-sized chunks to avoid ws library limit
+          const max = 120;
+          for(let i=0;i<text.length;i+=max){ ws.send(text.slice(i,i+max)); }
+        }catch(e){}
       });
       ws.on('close', ()=>{ try{ logStream.destroy(); }catch(e){} });
       return;
