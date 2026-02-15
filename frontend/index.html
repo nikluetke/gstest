@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Gameserver Manager - MVP</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+  <style>
+    body{font-family:system-ui,Arial;margin:20px}
+    table{border-collapse:collapse;width:100%;table-layout:fixed}
+    th,td{border:1px solid #ddd;padding:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    th{background:#f4f4f4}
+    button{padding:6px 10px;margin-right:6px}
+    #controls{margin-bottom:12px}
+    #createForm input, #createForm select{margin-right:6px}
+    #logModal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:80%;height:60%;background:#fff;border:1px solid #ccc;box-shadow:0 10px 30px rgba(0,0,0,.2);display:none;flex-direction:column}
+    #logModal pre{flex:1;overflow:auto;padding:10px;background:#000;color:#0f0;font-family:monospace;margin:0}
+    #logModal .head{padding:8px;border-bottom:1px solid #eee}
+    #consoleModal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:80%;height:70%;background:#fff;border:1px solid #ccc;box-shadow:0 10px 30px rgba(0,0,0,.2);display:none;flex-direction:column}
+    #consoleArea{flex:1;background:#000;color:#0f0;font-family:monospace;padding:10px;overflow:auto}
+    #consoleInput{width:100%;box-sizing:border-box;padding:8px;border-top:1px solid #ccc}
+  </style>
+</head>
+<body>
+  <h1>Gameserver Manager - MVP</h1>
+  <div id="controls">
+    <form id="createForm" onsubmit="return createServer()">
+      <label>Name <input id="name" required></label>
+      <label>Template <select id="template" onchange="onTemplateChange()">
+        <option value="itzg/minecraft-server:latest">Minecraft</option>
+        <option value="cm2network/steamcmd:root">CS:GO (SteamCMD)</option>
+        <option value="llnl/valheim-server:latest">Valheim</option>
+        <option value="iron/rust-server:latest">Rust</option>
+        <option value="alpine:3.18">Alpine (placeholder)</option>
+      </select></label>
+      <label>Image <input id="image" value="itzg/minecraft-server:latest" required></label>
+      <button type="submit">Create</button>
+      <span id="status">Loading…</span>
+    </form>
+  </div>
+  <table id="servers"><thead><tr><th style="width:30%">Name</th><th style="width:30%">Image</th><th style="width:20%">Status</th><th style="width:20%">Actions</th></tr></thead><tbody></tbody></table>
+
+  <div id="logModal">
+    <div class="head"><button onclick="closeLogs()">Close</button> <span id="logTitle"></span></div>
+    <pre id="logContent">Logs...</pre>
+  </div>
+
+  <div id="consoleModal">
+    <div class="head"><button onclick="closeConsole()">Close</button> <span id="consoleTitle"></span></div>
+    <div id="consoleArea"></div>
+    <input id="consoleInput" placeholder="Type and press Enter to send" />
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script>
+const apiBase = 'http://' + location.hostname + ':3000';
+let serversByName = {}; // preserve rows and avoid reflow
+let wsConsole = null; let xterm = null;
+
+function el(tag, props){ const e = document.createElement(tag); if(props) Object.assign(e, props); return e }
+
+function upsertRow(s){
+  const tb = document.querySelector('#servers tbody');
+  let row = serversByName[s.name];
+  if(!row){
+    row = document.createElement('tr');
+    row.innerHTML = `<td class="name"></td><td class="image"></td><td class="status"></td><td class="actions"></td>`;
+    serversByName[s.name] = row;
+    tb.appendChild(row);
+  }
+  row.querySelector('.name').textContent = s.name;
+  row.querySelector('.image').textContent = s.image;
+  row.querySelector('.status').textContent = s.status;
+  const actions = row.querySelector('.actions');
+  actions.innerHTML='';
+  const start = el('button',{textContent:'Start'});
+  start.onclick = ()=>fetch(apiBase+`/servers/${s.name}/start`,{method:'POST'}).then(()=>fetchAndUpdate());
+  const stop = el('button',{textContent:'Stop'});
+  stop.onclick = ()=>fetch(apiBase+`/servers/${s.name}/stop`,{method:'POST'}).then(()=>fetchAndUpdate());
+  const logs = el('button',{textContent:'Logs'});
+  logs.onclick = ()=>showLogs(s.name);
+  const consoleBtn = el('button',{textContent:'Console'});
+  consoleBtn.onclick = ()=>openConsole(s.name);
+  const remove = el('button',{textContent:'Remove'});
+  remove.onclick = ()=>{ if(confirm('Remove '+s.name+'?')) fetch(apiBase+`/servers/${s.name}/remove`,{method:'POST'}).then(()=>{ delete serversByName[s.name]; row.remove(); }); };
+  actions.appendChild(start); actions.appendChild(stop); actions.appendChild(logs); actions.appendChild(consoleBtn); actions.appendChild(remove);
+}
+
+async function fetchAndUpdate(){
+  document.getElementById('status').textContent = 'Loading…';
+  try{
+    const r = await fetch(apiBase + '/servers');
+    const j = await r.json();
+    const names = new Set();
+    (j.servers||[]).forEach(s=>{ upsertRow(s); names.add(s.name); });
+    // remove missing
+    Object.keys(serversByName).forEach(n=>{ if(!names.has(n)){ serversByName[n].remove(); delete serversByName[n]; } });
+    document.getElementById('status').textContent = '';
+  }catch(e){ document.getElementById('status').textContent = 'Error: '+e.message; }
+}
+
+function createServer(){
+  const name = document.getElementById('name').value.trim();
+  const image = document.getElementById('image').value.trim();
+  if(!name || !image) return false;
+  document.getElementById('status').textContent = 'Creating...';
+  fetch(apiBase + '/servers/create',{method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({name,image})})
+    .then(r=>r.json()).then(j=>{ document.getElementById('status').textContent=''; fetchAndUpdate(); })
+    .catch(e=>{ document.getElementById('status').textContent='Error: '+e.message });
+  return false;
+}
+
+function onTemplateChange(){ const t = document.getElementById('template').value; document.getElementById('image').value = t }
+
+async function showLogs(name){
+  document.getElementById('logTitle').textContent = name + ' - logs';
+  document.getElementById('logModal').style.display='flex';
+  const p = document.getElementById('logContent');
+  p.textContent = 'Connecting...';
+  try{
+    // use websocket streaming for live logs
+    const ws = new WebSocket(`ws://${location.hostname}:3000/ws?name=${encodeURIComponent(name)}&type=logs`);
+    p.textContent = '';
+    ws.onmessage = (ev)=>{ p.textContent += ev.data; p.scrollTop = p.scrollHeight };
+    ws.onopen = ()=>{};
+    ws.onclose = ()=>{ p.textContent += '\n<disconnected>'; };
+    // store to close when modal closed
+    p._ws = ws;
+  }catch(e){ p.textContent = 'Error: '+e.message }
+}
+function closeLogs(){ const p = document.getElementById('logContent'); if(p._ws) p._ws.close(); document.getElementById('logModal').style.display='none'; }
+
+function openConsole(name){
+  document.getElementById('consoleTitle').textContent = name + ' - console';
+  document.getElementById('consoleModal').style.display='flex';
+  const area = document.getElementById('consoleArea'); area.innerHTML='';
+  if(wsConsole){ wsConsole.close(); wsConsole=null }
+  // init xterm (guard if library missing)
+  let useXterm = false;
+  try{
+    if(!xterm && window.Terminal){ xterm = new window.Terminal(); xterm.open(document.getElementById('consoleArea')); }
+    useXterm = !!xterm;
+  }catch(e){ useXterm = false }
+  if(useXterm){
+    xterm.clear();
+  }else{
+    document.getElementById('consoleArea').textContent = '';
+  }
+
+  const ws = new WebSocket(`ws://${location.hostname}:3000/ws?name=${encodeURIComponent(name)}&type=console`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = ()=>{ if(useXterm) xterm.writeln('Connected'); else document.getElementById('consoleArea').textContent += 'Connected\n'; };
+  ws.onmessage = (ev)=>{ const data = (typeof ev.data === 'string') ? ev.data : new TextDecoder().decode(ev.data); if(useXterm) xterm.write(data); else { document.getElementById('consoleArea').textContent += data; document.getElementById('consoleArea').scrollTop = document.getElementById('consoleArea').scrollHeight } };
+  ws.onclose = ()=>{ if(useXterm) xterm.writeln('\r\n<disconnected>'); else document.getElementById('consoleArea').textContent += '\n<disconnected>'; };
+  if(useXterm) xterm.onData(d => { ws.send(d); }); else {
+    const input = document.getElementById('consoleInput'); input.onkeydown = (e)=>{ if(e.key==='Enter'){ ws.send(input.value+'\n'); input.value=''; e.preventDefault(); } }
+  }
+  wsConsole = ws;
+}
+function closeConsole(){ if(wsConsole){ wsConsole.close(); wsConsole=null } document.getElementById('consoleModal').style.display='none'; }
+
+fetchAndUpdate();
+setInterval(fetchAndUpdate,5000);
+</script>
+</body>
+</html>

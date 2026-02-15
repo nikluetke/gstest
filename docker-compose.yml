@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: gsadmin
+      POSTGRES_PASSWORD: gsadmin
+      POSTGRES_DB: gsdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build: ./api
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  placeholder-game:
+    image: alpine:3.18
+    command: ["/bin/sh","-c","while true; do echo placeholder-game running; sleep 60; done"]
+    restart: "no"
+
+volumes:
+  pgdata:
