@@ -35,21 +35,39 @@ app.get('/servers', async (req, res) => {
   }
 });
 
+// helper: find a free host port starting at base
+async function findFreePort(base){
+  const containers = await docker.listContainers({all:true});
+  const used = new Set();
+  containers.forEach(c => {
+    (c.Ports||[]).forEach(p => { if(p.PublicPort) used.add(p.PublicPort); });
+  });
+  let port = base;
+  while(used.has(port)) port++;
+  return port.toString();
+}
+
 // Create a new placeholder game container (image + name)
 app.post('/servers/create', async (req, res) => {
   const { name, image } = req.body;
   if (!name || !image) return res.status(400).json({ error: 'name and image required' });
   try{
+    // template heuristics: if image looks like minecraft, expose 25565, else no host binding
+    const isMinecraft = image.toLowerCase().includes('minecraft') || image.toLowerCase().includes('itzg/minecraft');
     const opts = {
       Image: image,
       name: name,
       Labels: { gs_manager: '1' },
       HostConfig: {
         RestartPolicy: { Name: 'no' },
-        Binds: [`/opt/games/${name}:/data`],
-        PortBindings: { '25565/tcp': [{ HostPort: '25565' }] }
+        Binds: [`/opt/games/${name}:/data`]
       }
     };
+    if(isMinecraft){
+      const hostPort = await findFreePort(25565);
+      opts.ExposedPorts = { '25565/tcp': {} };
+      opts.HostConfig.PortBindings = { '25565/tcp': [{ HostPort: hostPort }] };
+    }
     const container = await docker.createContainer(opts);
     await container.start();
     res.json({ id: container.id });
