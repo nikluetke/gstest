@@ -45,6 +45,8 @@ app.get('/servers', async (req, res) => {
           const binding = ports[key] && ports[key][0];
           if(binding && binding.HostPort){ s.hostPort = binding.HostPort; break }
         }
+        // fallback: check label stored at creation time
+        if(!s.hostPort && info.Config && info.Config.Labels && info.Config.Labels.gs_host_port){ s.hostPort = info.Config.Labels.gs_host_port }
       }catch(e){}
       return s;
     }));
@@ -101,6 +103,9 @@ app.post('/servers/create', async (req, res) => {
       opts.ExposedPorts = { '25565/tcp': {} };
       opts.HostConfig.PortBindings = { '25565/tcp': [{ HostPort: hostPort }] };
       opts._hostPort = hostPort; // for response
+      // record chosen host port in labels so we can show it even if container not running
+      opts.Labels = opts.Labels || {};
+      opts.Labels.gs_host_port = String(hostPort);
     } else if(tpl && tpl.ports && tpl.ports.length){
       // map template ports to available host ports sequentially
       opts.ExposedPorts = {};
