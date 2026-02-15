@@ -16,7 +16,7 @@ Actions taken:
 
 Security notes & caution:
 - Mounting the Docker socket gives the API full control over the host Docker daemon. This is acceptable for an MVP on a trusted single-user server but must be hardened for production.
-- Consider using a privileged helper-daemon with restricted commands or a socket-proxy for production.
+- Consider using a privileged helper daemon with restricted commands or a socket-proxy for production.
 
 Next steps performed: Attempting to build and start the composition.
 
@@ -42,4 +42,15 @@ Excerpt from logs (important lines):
 Notes:
 - Server is reachable on the host's IP at port 25565 from public/private network depending on firewall.
 - Next: integrate this server into the API's listing (it already has label gs_manager=1), implement console/websocket, backups, and auth.
+
+2026-02-15 10:16 CET - Installed deploy key and pushed to GitHub
+- Generated ED25519 deploy key on the server: /root/.ssh/id_gstest
+- Public key provided and added to repository deploy keys with write access
+- Pushed initial project files to https://github.com/nikluetke/gstest
+
+2026-02-15 12:38 CET - UI: Theme selection and system preference implemented
+- Added theme selector to frontend (System/Light/Dark)
+- Implemented automatic detection of system prefers-color-scheme and listener for changes
+- Persist theme choice in localStorage
+- Default behavior: 'system' uses system preference; overall UI variables default to dark when system prefers dark
 

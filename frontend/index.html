@@ -186,6 +186,38 @@ function openConsole(name){
 }
 function closeConsole(){ if(wsConsole){ wsConsole.close(); wsConsole=null } document.getElementById('consoleModal').style.display='none'; }
 
+// Theme handling
+function applyThemeClass(choice){
+  document.documentElement.classList.remove('theme-dark','theme-light');
+  if(choice==='dark') document.documentElement.classList.add('theme-dark');
+  if(choice==='light') document.documentElement.classList.add('theme-light');
+}
+
+function setTheme(mode){
+  // mode: system|light|dark
+  localStorage.setItem('theme.choice', mode);
+  if(mode==='system'){
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyThemeClass(prefersDark ? 'dark' : 'light');
+  }else{
+    applyThemeClass(mode);
+  }
+}
+
+// detect system and listen for changes
+function initTheme(){
+  const saved = localStorage.getItem('theme.choice') || 'system';
+  document.getElementById('themeSelect').value = saved;
+  if(saved==='system'){
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    applyThemeClass(mq.matches ? 'dark' : 'light');
+    mq.addEventListener('change', e => { if(localStorage.getItem('theme.choice')==='system') applyThemeClass(e.matches ? 'dark' : 'light'); });
+  }else{
+    applyThemeClass(saved);
+  }
+}
+
+initTheme();
 fetchAndUpdate();
 setInterval(fetchAndUpdate,5000);
 </script>
