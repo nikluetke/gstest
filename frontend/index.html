@@ -97,7 +97,10 @@ function upsertRow(s){
     fetchAndUpdate();
   };
   actions.appendChild(editPort);
-  actions.appendChild(remove);
+  // remove button
+  const removeBtn = el('button',{textContent:'Remove'});
+  removeBtn.onclick = ()=>{ if(confirm('Remove '+s.name+'?')) fetch(apiBase+`/servers/${s.name}/remove`,{method:'POST'}).then(()=>{ delete serversByName[s.name]; row.remove(); }); };
+  actions.appendChild(removeBtn);
 }
 
 async function fetchAndUpdate(){
