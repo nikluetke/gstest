@@ -7,9 +7,15 @@
   <style>
     body{font-family:system-ui,Arial;margin:20px}
     table{border-collapse:collapse;width:100%;table-layout:fixed}
-    th,td{border:1px solid #ddd;padding:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    th{background:#f4f4f4}
-    button{padding:6px 10px;margin-right:6px}
+    th,td{border:1px solid var(--border);padding:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    th{background:var(--th-bg)}
+    button{padding:6px 10px;margin:4px;white-space:nowrap}
+    td .actions{display:flex;gap:6px;flex-wrap:wrap}
+    :root{--bg:#ffffff;--text:#000000;--border:#ddd;--th-bg:#f4f4f4}
+    .theme-dark{--bg:#0b0b0d;--text:#e6eef8;--border:#222;--th-bg:#111}
+    .theme-light{--bg:#ffffff;--text:#000000;--border:#ddd;--th-bg:#f4f4f4}
+    body{background:var(--bg);color:var(--text)}
+    table, #logModal, #consoleModal{background:var(--bg)}
     #controls{margin-bottom:12px}
     #createForm input, #createForm select{margin-right:6px}
     #logModal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:80%;height:60%;background:#fff;border:1px solid #ccc;box-shadow:0 10px 30px rgba(0,0,0,.2);display:none;flex-direction:column}
@@ -36,8 +42,11 @@
       <button type="submit">Create</button>
       <span id="status">Loading…</span>
     </form>
+    <div style="margin-top:8px">
+      Theme: <select id="themeSelect" onchange="setTheme(this.value)"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+    </div>
   </div>
-  <table id="servers"><thead><tr><th style="width:25%">Name</th><th style="width:25%">Image</th><th style="width:15%">Status</th><th style="width:15%">Port</th><th style="width:20%">Actions</th></tr></thead><tbody></tbody></table>
+  <table id="servers"><thead><tr><th style="width:22%">Name</th><th style="width:28%">Image</th><th style="width:12%">Status</th><th style="width:10%">Port</th><th style="width:28%">Actions</th></tr></thead><tbody></tbody></table>
 
   <div id="logModal">
     <div class="head"><button onclick="closeLogs()">Close</button> <span id="logTitle"></span></div>
@@ -73,9 +82,10 @@ function upsertRow(s){
   // port display
   let portCell = row.querySelector('.port');
   if(!portCell){ portCell = document.createElement('td'); portCell.className='port'; row.insertBefore(portCell, row.querySelector('.actions')); }
-  // try to parse host port from status or from s.ports
-  portCell.textContent = s.hostPort || '';
+  // try to parse host port from s.hostPort or leave dash
+  portCell.textContent = s.hostPort || '-';
   const actions = row.querySelector('.actions');
+  actions.classList.add('actions');
   actions.innerHTML='';
   const start = el('button',{textContent:'Start'});
   start.onclick = ()=>fetch(apiBase+`/servers/${s.name}/start`,{method:'POST'}).then(()=>fetchAndUpdate());
