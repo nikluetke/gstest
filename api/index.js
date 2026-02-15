@@ -37,7 +37,16 @@ app.get('/servers', async (req, res) => {
     const containers = await docker.listContainers({all:true, filters: {label: ['gs_manager=1']}});
     const servers = await Promise.all(containers.map(async c => {
       const container = docker.getContainer(c.Id);
-      return containerToServer(container);
+      const s = await containerToServer(container);
+      try{
+        const info = await container.inspect();
+        const ports = info.NetworkSettings && info.NetworkSettings.Ports ? info.NetworkSettings.Ports : {};
+        for(const key of Object.keys(ports)){
+          const binding = ports[key] && ports[key][0];
+          if(binding && binding.HostPort){ s.hostPort = binding.HostPort; break }
+        }
+      }catch(e){}
+      return s;
     }));
     res.json({ servers });
   }catch(err){
