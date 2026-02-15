@@ -12,7 +12,7 @@ Actions taken:
 3) API design decisions:
    - Control Docker via mounted /var/run/docker.sock in api container.
    - Label managed containers with label 'gs_manager=1'.
-   - Provide simple endpoints: list/create/start/stop/remove.
+   - Provide endpoints: /servers, /servers/create, /servers/:name/start|stop|remove|port, /templates, /servers/:name/logs
 
 Security notes & caution:
 - Mounting the Docker socket gives the API full control over the host Docker daemon. This is acceptable for an MVP on a trusted single-user server but must be hardened for production.
@@ -29,34 +29,45 @@ Actions taken:
 
 Result / Status:
 - Image pull completed and container created: container id 2ecfddc972d1
-- Docker reports the container as: Up 2 minutes (healthy)
-- Ports: 0.0.0.0:25565->25565/tcp
+- Docker reports the container as: Up (healthy)
 - Logs show server startup completed and server reported "Done" (1.21.11) and RCON listening on port 25575. World created (no existing world data).
 
-Excerpt from logs (important lines):
-- Starting Minecraft server version 1.21.11
-- Starting Minecraft server on *:25565
-- Done (5.269s)! For help, type "help"
-- RCON running on 0.0.0.0:25575
-
-Notes:
-- Server is reachable on the host's IP at port 25565 from public/private network depending on firewall.
-- Next: integrate this server into the API's listing (it already has label gs_manager=1), implement console/websocket, backups, and auth.
-
-2026-02-15 10:16 CET - Installed deploy key and pushed to GitHub
+2026-02-15 11:45 CET - GitHub deploy key and initial push
 - Generated ED25519 deploy key on the server: /root/.ssh/id_gstest
-- Public key provided and added to repository deploy keys with write access
-- Pushed initial project files to https://github.com/nikluetke/gstest
+- Added public key as repository Deploy Key on GitHub (write allowed)
+- Successfully pushed project to git@github.com:nikluetke/gstest.git
 
-2026-02-15 12:38 CET - UI: Theme selection and system preference implemented
-- Added theme selector to frontend (System/Light/Dark)
-- Implemented automatic detection of system prefers-color-scheme and listener for changes
-- Persist theme choice in localStorage
-- Default behavior: 'system' uses system preference; overall UI variables default to dark when system prefers dark
+2026-02-15 11:50-12:40 CET - Iterative development (API, frontend, features)
+- Implemented Express API with dockerode to manage containers via Docker socket.
+- Endpoints implemented: list/create/start/stop/remove, logs, port update, templates, WebSocket console/log streaming.
+- Implemented frontend (static) with dynamic server list and actions (Start, Stop, Logs, Console, Remove, Edit Port).
+- Implemented WebSocket-based live logs (type=logs) and interactive console (type=console) using docker exec and attached streams.
+- Added CORS handling to API and switched from shell docker calls to dockerode.
+- Implemented template presets for Minecraft, CS:GO, Valheim, Rust, Alpine.
+- Implemented automatic host-port allocation and persistence (label gs_host_port) to avoid port collisions.
+- Implemented port-edit endpoint that recreates container with new host port while preserving bind volume.
+- UI improvements: port column, edit port, create wizard template dropdown, icons, status badges, theme selector, responsive layout, xterm integration for console.
+- Implemented theme auto-detect (prefers-color-scheme) with persistence in localStorage and listener for system changes.
+- Implemented safer WebSocket chunking for log streaming to avoid ws lib message size errors.
+- Removed test containers and cleaned up broken containers on user request.
 
-2026-02-15 12:44 CET - UX: Modern responsive UI
-- Reworked frontend CSS to a modern card-based responsive layout
-- Improved table responsiveness for narrow viewports (rows become cards)
-- Buttons styled, badges, and modals updated to match dark/light themes
-- Committed AND pushed UI improvements
+2026-02-15 12:44 CET - Rate-limit policy change
+- To avoid GitHub/API rate limits, changed push behavior: bundle/pause frequent pushes. Default: batch pushes (at most once per 5 minutes) unless user explicitly requests immediate push.
+- Implemented exponential backoff on push retries.
 
+2026-02-15 12:48 CET - Memory snippet created for session reset
+- Created workspace/memory/PROJECT_MEMORY.md with minimal facts needed after session reset (repo URL, deploy key location, service layout, template list, important files, policies).
+
+2026-02-15 13:13 CET - UI polish, icons, responsive redesign
+- Modernized frontend CSS to a card-based responsive layout; improved buttons, badges, and modal styles.
+- Added inline SVG icons for common game images and status formatting.
+- Ensured port display reads NetworkSettings.Ports and falls back to label gs_host_port for containers created after the change.
+
+Open items / next recommendations
+- Harden API (Auth/JWT) before exposing publicly.
+- Template-specific refinements (per-game env, UDP ports, install steps for SteamCMD games).
+- Improve console UX: proper xterm resizing, copy/paste, terminal logging.
+- Add backups (volume snapshots) and restore UI.
+
+Timestamp: 2026-02-15 13:19 CET
+Saved by: zapclaw assistant
